@@ -3,6 +3,9 @@
     windows_subsystem = "windows"
 )]
 
+use tauri::Manager;
+use tauri_plugin_spotlight::ManagerExt;
+
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -11,9 +14,18 @@ fn greet(name: &str) -> String {
 
 fn main() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_spotlight::init())
+        .plugin(tauri_plugin_spotlight::init(tauri_plugin_spotlight::Config {
+            close_shortcut: Some(String::from("Escape")),
+            hide_when_inactive: true,
+        }))
         .invoke_handler(tauri::generate_handler![greet])
         .setup(|app| {
+            if let Some(window) = app.get_window("main") {
+                app.spotlight().init_spotlight_window(&window, "Ctrl+Shift+J");
+            }
+            if let Some(window) = app.get_window("secondary") {
+                app.spotlight().init_spotlight_window(&window, "Ctrl+Shift+K");
+            }
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             Ok(())
         })

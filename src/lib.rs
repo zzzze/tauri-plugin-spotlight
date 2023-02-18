@@ -1,19 +1,26 @@
 mod spotlight;
 
+pub use spotlight::Config;
+
 use tauri::{
     plugin::{Builder, TauriPlugin},
-    Manager, Wry
+    Manager, Wry, Runtime, State
 };
 
-pub fn init() -> TauriPlugin<Wry> {
+pub trait ManagerExt<R: Runtime> {
+    fn spotlight(&self) -> State<'_, spotlight::SpotlightManager>;
+}
+
+impl<R: Runtime, T: Manager<R>> ManagerExt<R> for T {
+  fn spotlight(&self) -> State<'_, spotlight::SpotlightManager> {
+    self.state::<spotlight::SpotlightManager>()
+  }
+}
+
+pub fn init(config: Config) -> TauriPlugin<Wry> {
     Builder::new("spotlight")
-        .invoke_handler(tauri::generate_handler![
-            spotlight::init_spotlight_window,
-        ])
         .setup(|app| {
-            // let w = app.get_window("main");
-            app.manage(spotlight::SpotlightManager::default());
-            set_state!(app, frontmost_window_path, spotlight::get_frontmost_app_path());
+            app.manage(spotlight::SpotlightManager::new(config));
             Ok(())
         })
         .build()

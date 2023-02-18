@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import './App.css'
 
-void invoke('plugin:spotlight|init_spotlight_window')
-
 function App () {
   const [greetMsg, setGreetMsg] = useState('')
   const [name, setName] = useState('')

@@ -59,10 +59,26 @@
     },
     "windows": [
       {
+        "label": "main",
+        "url": "index.html",
         "decorations": false,
         "fullscreen": false,
         "transparent": true,
         "height": 200,
+        "resizable": false,
+        "title": "react-app",
+        "center": true,
+        "alwaysOnTop": true,
+        "width": 600
+      },
+      {
+        "label": "secondary",
+        "url": "index.html",
+        "visible": false,
+        "decorations": false,
+        "fullscreen": false,
+        "transparent": true,
+        "height": 600,
         "resizable": false,
         "title": "react-app",
         "center": true,

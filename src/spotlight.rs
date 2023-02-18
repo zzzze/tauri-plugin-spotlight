@@ -10,66 +10,83 @@ use tauri::{
 };
 use objc::runtime::{Class, Object, Sel};
 
-#[derive(Default)]
-pub struct Store {
-    pub frontmost_window_path: Option<String>,
-}
-
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct SpotlightManager {
-    pub store: Mutex<Store>,
+    close_shortcut: Option<String>,
+    hide_when_inactive: bool,
+    previous_app: Mutex<Option<String>>,
+    registered_window: Mutex<Vec<String>>,
 }
 
-#[macro_export]
-macro_rules! set_state {
-    ($app_handle:expr, $field:ident, $value:expr) => {{
-        let handle = $app_handle.app_handle();
-        handle
-            .state::<$crate::spotlight::SpotlightManager>()
-            .store
-            .lock()
-            .unwrap()
-            .$field = $value;
-    }};
+pub struct Config {
+    pub close_shortcut: Option<String>,
+    pub hide_when_inactive: bool,
 }
 
-#[macro_export]
-macro_rules! get_state {
-    ($app_handle:expr, $field:ident) => {{
-        let handle = $app_handle.app_handle();
-        let value = handle
-            .state::<$crate::spotlight::SpotlightManager>()
-            .store
-            .lock()
-            .unwrap()
-            .$field;
-        value
-    }};
-    ($app_handle:expr, $field:ident, $action:ident) => {{
-        let handle = $app_handle.app_handle();
-        let value = handle
-            .state::<$crate::spotlight::SpotlightManager>()
-            .store
-            .lock()
-            .unwrap()
-            .$field
-            .$action();
-        value
-    }};
+impl SpotlightManager {
+    pub fn new(config: Config) -> Self {
+        let mut manager = Self::default();
+        manager.close_shortcut = config.close_shortcut;
+        manager.hide_when_inactive = config.hide_when_inactive;
+        manager
+    }
+
+    pub fn init_spotlight_window(&self, window: &Window<Wry>, shortcut: &str) {
+        let registered = set_previous_app(&window, get_frontmost_app_path());
+        if !registered {
+            register_shortcut(&window, shortcut);
+            register_spotlight_window_backdrop(&window);
+            set_spotlight_window_collection_behavior(&window);
+            set_window_above_menubar(&window);
+        }
+    }
+}
+
+fn set_previous_app(window: &Window<Wry>, value: Option<String>) -> bool {
+    let label = window.label().to_string();
+    let handle = window.app_handle();
+    let state = handle.state::<SpotlightManager>();
+    let mut registered_window = state
+        .registered_window
+        .lock()
+        .unwrap();
+    let existed = registered_window.contains(&label);
+    if let Some(current_app_path) = std::env::current_exe().unwrap().to_str() {
+        if Some(current_app_path.to_string()) == value {
+            return existed;
+        }
+    }
+    if !existed {
+        registered_window.push(label);
+    }
+    let mut previous_app = state
+        .previous_app
+        .lock()
+        .unwrap();
+    *previous_app = value;
+    existed
+}
+
+fn get_previous_app(window: &Window<Wry>) -> Option<String> {
+    let handle = window.app_handle();
+    let state = handle.state::<SpotlightManager>();
+    let previous_app = state
+        .previous_app
+        .lock()
+        .unwrap();
+    previous_app.clone()
 }
 
 #[macro_export]
 macro_rules! nsstring_to_string {
     ($ns_string:expr) => {{
         use objc::{sel, sel_impl};
-        let utf8: id = unsafe { objc::msg_send![$ns_string, UTF8String] };
+        let utf8: id = objc::msg_send![$ns_string, UTF8String];
         let string = if !utf8.is_null() {
-            Some(unsafe {
-                {
-                    std::ffi::CStr::from_ptr(utf8 as *const std::ffi::c_char)
-                        .to_string_lossy()
-                        .into_owned()
-                }
+            Some({
+                std::ffi::CStr::from_ptr(utf8 as *const std::ffi::c_char)
+                    .to_string_lossy()
+                    .into_owned()
             })
         } else {
             None
@@ -123,50 +140,62 @@ fn switch_to_app(bundle_url: &str) {
     };
 }
 
-
-
-
-#[tauri::command]
-pub fn init_spotlight_window(window: Window<Wry>) {
-    register_shortcut(&window);
-    register_spotlight_window_backdrop(&window);
-    set_spotlight_window_collection_behavior(&window);
-    set_window_above_menubar(&window);
-}
-
-fn register_shortcut(window: &Window<Wry>) {
+fn register_shortcut(window: &Window<Wry>, shortcut: &str) {
     let window = window.to_owned();
+    let w = window.clone();
     let mut shortcut_manager = window.app_handle().global_shortcut_manager();
-
-    let handle = window.app_handle();
-    if let Err(e) = shortcut_manager.register("Ctrl+Shift+J", move || {
+    if let Err(e) = shortcut_manager.register(shortcut, move || {
         position_window_at_the_center_of_the_monitor_with_cursor(&window);
         if window.is_visible().unwrap() {
             window.hide().unwrap();
-            let w = window.to_owned();
-            if let Some(prev_frontmost_window_path) = get_state!(w.app_handle(), frontmost_window_path, clone) {
+            if let Some(prev_frontmost_window_path) = get_previous_app(&window) {
                 println!("prev_frontmost_window_path: {:?}", prev_frontmost_window_path);
                 switch_to_app(&prev_frontmost_window_path);
             }
-
-
         } else {
-            set_state!(handle, frontmost_window_path, get_frontmost_app_path());
+            set_previous_app(&window, get_frontmost_app_path());
             println!("frontmost window path {:?}", get_frontmost_app_path());
             window.set_focus().unwrap();
         }
     }) {
         println!("err: {}", e);
     }
+    let app_handle = w.app_handle();
+    let state = app_handle.state::<SpotlightManager>();
+    if let Some(close_shortcut) = state.close_shortcut.clone() {
+        if let Err(e) = shortcut_manager.register(&close_shortcut, move || {
+            let app_handle = w.app_handle();
+            let state = app_handle.state::<SpotlightManager>();
+            let registered_window = state.registered_window.lock().unwrap();
+            let window_labels = registered_window.clone();
+            std::mem::drop(registered_window);
+            for label in window_labels {
+                if let Some(window) = app_handle.get_window(&label) {
+                    if window.is_visible().unwrap() {
+                        window.hide().unwrap();
+                        if let Some(prev_frontmost_window_path) = get_previous_app(&window) {
+                            switch_to_app(&prev_frontmost_window_path);
+                        }
+                    }
+                }
+            }
+        }) {
+            println!("err: {}", e);
+        }
+    }
 }
 
 fn register_spotlight_window_backdrop(window: &Window<Wry>) {
     let w = window.to_owned();
-    window.on_window_event(move |event| {
-        if let WindowEvent::Focused(false) = event {
-            w.hide().unwrap();
-        }
-    });
+    let app_handle = w.app_handle();
+    let state = app_handle.state::<SpotlightManager>();
+    if state.hide_when_inactive {
+        window.on_window_event(move |event| {
+            if let WindowEvent::Focused(false) = event {
+                w.hide().unwrap();
+            }
+        });
+    }
 }
 
 /// Positions a given window at the center of the monitor with cursor
@@ -244,7 +273,7 @@ fn get_monitor_with_cursor() -> Option<Monitor> {
 
         if let Some(frame) = frame_with_cursor {
             let name: id = unsafe { msg_send![next_screen, localizedName] };
-            let screen_name = nsstring_to_string!(name);
+            let screen_name = unsafe { nsstring_to_string!(name) };
             let scale_factor: CGFloat = unsafe { msg_send![next_screen, backingScaleFactor] };
             let scale_factor: f64 = scale_factor;
 
@@ -271,5 +300,5 @@ pub fn get_frontmost_app_path() -> Option<String> {
     let frontmost_app: id = unsafe { msg_send![shared_workspace, frontmostApplication] };
     let bundle_url: id = unsafe { msg_send![frontmost_app, bundleURL] };
     let path: id = unsafe { msg_send![bundle_url, path] };
-    nsstring_to_string!(path)
+    unsafe { nsstring_to_string!(path) }
 }
