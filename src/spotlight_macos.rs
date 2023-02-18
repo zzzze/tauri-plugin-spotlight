@@ -37,10 +37,32 @@ impl SpotlightManager {
     pub fn init_spotlight_window(&self, window: &Window<Wry>, shortcut: &str) -> Result<(), Error> {
         let registered = set_previous_app(&window, get_frontmost_app_path())?;
         if !registered {
-            register_shortcut(&window, shortcut)?;
+            register_shortcut_for_window(&window, shortcut)?;
+            register_close_shortcut(&window)?;
             register_spotlight_window_backdrop(&window);
             set_spotlight_window_collection_behavior(&window)?;
             set_window_above_menubar(&window)?;
+        }
+        Ok(())
+    }
+
+    pub fn show(&self, window: &Window<Wry>) -> Result<(), Error> {
+        if !window.is_visible().map_err(|_| Error::FailedToCheckWindowVisibility)? {
+            position_window_at_the_center_of_the_monitor_with_cursor(&window).unwrap();
+            set_previous_app(&window, get_frontmost_app_path())?;
+            println!("frontmost window path {:?}", get_frontmost_app_path());
+            window.set_focus().map_err(|_| Error::FailedToShowWindow)?;
+        }
+        Ok(())
+    }
+
+    pub fn hide(&self, window: &Window<Wry>) -> Result<(), Error> {
+        if window.is_visible().map_err(|_| Error::FailedToCheckWindowVisibility)? {
+            window.hide().map_err(|_| Error::FailedToHideWindow)?;
+            if let Ok(Some(prev_frontmost_window_path)) = get_previous_app(&window) {
+                println!("prev_frontmost_window_path: {:?}", prev_frontmost_window_path);
+                active_another_app(&prev_frontmost_window_path)?;
+            }
         }
         Ok(())
     }
@@ -139,43 +161,38 @@ fn active_another_app(bundle_url: &str) -> Result<(), Error> {
     Ok(())
 }
 
-fn register_shortcut(window: &Window<Wry>, shortcut: &str) -> Result<(), Error> {
+fn register_shortcut_for_window(window: &Window<Wry>, shortcut: &str) -> Result<(), Error> {
     let window = window.to_owned();
-    let w = window.clone();
     let mut shortcut_manager = window.app_handle().global_shortcut_manager();
     shortcut_manager.register(shortcut, move || {
-        position_window_at_the_center_of_the_monitor_with_cursor(&window).unwrap();
+        let app_handle = window.app_handle();
+        let manager = app_handle.state::<SpotlightManager>();
         if window.is_visible().unwrap() {
-            window.hide().unwrap();
-            if let Ok(Some(prev_frontmost_window_path)) = get_previous_app(&window) {
-                println!("prev_frontmost_window_path: {:?}", prev_frontmost_window_path);
-                active_another_app(&prev_frontmost_window_path).unwrap();
-            }
+            manager.hide(&window).unwrap();
         } else {
-            set_previous_app(&window, get_frontmost_app_path()).unwrap();
-            println!("frontmost window path {:?}", get_frontmost_app_path());
-            window.set_focus().unwrap();
+            manager.show(&window).unwrap();
         }
     }).map_err(|_| Error::FailedToRegisterShortcut)?;
-    let app_handle = w.app_handle();
-    let state = app_handle.state::<SpotlightManager>();
-    if let Some(close_shortcut) = state.close_shortcut.clone() {
+    Ok(())
+}
+
+fn register_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
+    let window = window.to_owned();
+    let mut shortcut_manager = window.app_handle().global_shortcut_manager();
+    let app_handle = window.app_handle();
+    let manager = app_handle.state::<SpotlightManager>();
+    if let Some(close_shortcut) = manager.close_shortcut.clone() {
         if let Ok(registered) = shortcut_manager.is_registered(&close_shortcut) {
             if !registered {
                 shortcut_manager.register(&close_shortcut, move || {
-                    let app_handle = w.app_handle();
+                    let app_handle = window.app_handle();
                     let state = app_handle.state::<SpotlightManager>();
                     let registered_window = state.registered_window.lock().unwrap();
                     let window_labels = registered_window.clone();
                     std::mem::drop(registered_window);
                     for label in window_labels {
                         if let Some(window) = app_handle.get_window(&label) {
-                            if window.is_visible().unwrap() {
-                                window.hide().unwrap();
-                                if let Ok(Some(prev_frontmost_window_path)) = get_previous_app(&window) {
-                                    active_another_app(&prev_frontmost_window_path).unwrap();
-                                }
-                            }
+                            state.hide(&window).unwrap();
                         }
                     }
                 }).map_err(|_| Error::FailedToRegisterShortcut)?;

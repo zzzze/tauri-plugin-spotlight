@@ -6,4 +6,7 @@ pub enum Error {
     FailedToGetNSWindow,
     FailedToGetNSWorkspaceClass,
     FailedToGetNSObjectClass,
+    FailedToCheckWindowVisibility,
+    FailedToHideWindow,
+    FailedToShowWindow,
 }

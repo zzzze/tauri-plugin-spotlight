@@ -8,7 +8,7 @@ pub use error::Error;
 
 use tauri::{
     plugin::{Builder, TauriPlugin},
-    Manager, Wry, Runtime, State
+    Manager, Wry, Runtime, State, Window
 };
 
 pub trait ManagerExt<R: Runtime> {
@@ -21,8 +21,19 @@ impl<R: Runtime, T: Manager<R>> ManagerExt<R> for T {
   }
 }
 
+#[tauri::command]
+fn show(manager: State<'_, spotlight::SpotlightManager>, window: Window<Wry>) -> Result<(), String> {
+    manager.show(&window).map_err(|err| format!("{:?}", err))
+}
+
+#[tauri::command]
+fn hide(manager: State<'_, spotlight::SpotlightManager>, window: Window<Wry>) -> Result<(), String> {
+    manager.hide(&window).map_err(|err| format!("{:?}", err))
+}
+
 pub fn init(config: Config) -> TauriPlugin<Wry> {
     Builder::new("spotlight")
+        .invoke_handler(tauri::generate_handler![show, hide])
         .setup(|app| {
             app.manage(spotlight::SpotlightManager::new(config));
             Ok(())

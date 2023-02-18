@@ -34,41 +34,61 @@ impl SpotlightManager {
             .map_err(|_| Error::FailedToLockMutex)?;
         let registered = registered_window.contains(&label);
         if !registered {
-            register_shortcut(&window, shortcut)?;
+            register_shortcut_for_window(&window, shortcut)?;
+            register_close_shortcut(&window)?;
             register_spotlight_window_backdrop(&window);
             registered_window.push(label);
         }
         Ok(())
     }
+
+    pub fn show(&self, window: &Window<Wry>) -> Result<(), Error> {
+        if !window.is_visible().map_err(|_| Error::FailedToCheckWindowVisibility)? {
+            window.set_focus().map_err(|_| Error::FailedToShowWindow)?;
+        }
+        Ok(())
+    }
+
+    pub fn hide(&self, window: &Window<Wry>) -> Result<(), Error> {
+        if window.is_visible().map_err(|_| Error::FailedToCheckWindowVisibility)? {
+            window.hide().map_err(|_| Error::FailedToHideWindow)?;
+        }
+        Ok(())
+    }
 }
 
-fn register_shortcut(window: &Window<Wry>, shortcut: &str) -> Result<(), Error> {
+fn register_shortcut_for_window(window: &Window<Wry>, shortcut: &str) -> Result<(), Error> {
     let window = window.to_owned();
-    let w = window.clone();
     let mut shortcut_manager = window.app_handle().global_shortcut_manager();
     shortcut_manager.register(shortcut, move || {
+        let app_handle = window.app_handle();
+        let manager = app_handle.state::<SpotlightManager>();
         if window.is_visible().unwrap() {
-            window.hide().unwrap();
+            manager.hide(&window).unwrap();
         } else {
-            window.set_focus().unwrap();
+            manager.show(&window).unwrap();
         }
     }).map_err(|_| Error::FailedToRegisterShortcut)?;
-    let app_handle = w.app_handle();
-    let state = app_handle.state::<SpotlightManager>();
-    if let Some(close_shortcut) = state.close_shortcut.clone() {
+    Ok(())
+}
+
+fn register_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
+    let window = window.to_owned();
+    let mut shortcut_manager = window.app_handle().global_shortcut_manager();
+    let app_handle = window.app_handle();
+    let manager = app_handle.state::<SpotlightManager>();
+    if let Some(close_shortcut) = manager.close_shortcut.clone() {
         if let Ok(registered) = shortcut_manager.is_registered(&close_shortcut) {
             if !registered {
                 shortcut_manager.register(&close_shortcut, move || {
-                    let app_handle = w.app_handle();
+                    let app_handle = window.app_handle();
                     let state = app_handle.state::<SpotlightManager>();
                     let registered_window = state.registered_window.lock().unwrap();
                     let window_labels = registered_window.clone();
                     std::mem::drop(registered_window);
                     for label in window_labels {
                         if let Some(window) = app_handle.get_window(&label) {
-                            if window.is_visible().unwrap() {
-                                window.hide().unwrap();
-                            }
+                            window.hide().unwrap();
                         }
                     }
                 }).map_err(|_| Error::FailedToRegisterShortcut)?;
