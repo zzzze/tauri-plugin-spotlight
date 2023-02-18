@@ -1,3 +1,5 @@
+#[cfg_attr(target_os = "macos", path = "spotlight_macos.rs")]
+#[cfg_attr(not(target_os = "macos"), path = "spotlight_others.rs")]
 mod spotlight;
 
 pub use spotlight::Config;
