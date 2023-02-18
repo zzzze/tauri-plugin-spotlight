@@ -1,14 +1,16 @@
 use std::sync::Mutex;
 use cocoa::{
-    appkit::{CGFloat, NSMainMenuWindowLevel, NSWindow, NSWindowCollectionBehavior},
+    appkit::{CGFloat, NSMainMenuWindowLevel, NSWindow, NSWindowCollectionBehavior, NSApplicationActivateIgnoringOtherApps},
     base::{id, nil, BOOL, NO, YES},
     foundation::{NSPoint, NSRect},
 };
-use objc::{class, msg_send, sel, sel_impl};
+use objc::{
+    class, msg_send, sel, sel_impl,
+    runtime::{Class, Object},
+};
 use tauri::{
     GlobalShortcutManager, Manager, PhysicalPosition, PhysicalSize, Window, WindowEvent, Wry,
 };
-use objc::runtime::{Class, Object, Sel};
 
 #[derive(Default, Debug)]
 pub struct SpotlightManager {
@@ -91,52 +93,40 @@ macro_rules! nsstring_to_string {
         } else {
             None
         };
-
         string
     }};
 }
 
-fn switch_to_app(bundle_url: &str) {
+fn active_another_app(bundle_url: &str) {
     let workspace = unsafe {
         let workspace_class = Class::get("NSWorkspace").unwrap();
-        let shared_workspace_selector = Sel::register("sharedWorkspace");
         let shared_workspace: *mut Object = msg_send![workspace_class, sharedWorkspace];
         shared_workspace
     };
-
     let running_apps = unsafe {
-        let running_apps_selector = Sel::register("runningApplications");
         let running_apps: *mut Object = msg_send![workspace, runningApplications];
         running_apps
     };
-
-    let target_app_bundle_url = bundle_url;
-
     let target_app = unsafe {
         let count = msg_send![running_apps, count];
-        (|| {
-            for i in 0..count {
-                let app: *mut Object = msg_send![running_apps, objectAtIndex: i];
-                let app_bundle_url: id = msg_send![app, bundleURL];
-                let path: id = msg_send![app_bundle_url, path];
-                let app_bundle_url_str = nsstring_to_string!(path);
-
-                if let Some(app_bundle_url_str) = app_bundle_url_str {
-                    if app_bundle_url_str == target_app_bundle_url.to_string() {
-                        return app;
-                    }
+        let ns_object_class = Class::get("NSObject").unwrap();
+        let mut target_app = msg_send![ns_object_class, alloc];
+        for i in 0..count {
+            let app: *mut Object = msg_send![running_apps, objectAtIndex: i];
+            let app_bundle_url: id = msg_send![app, bundleURL];
+            let path: id = msg_send![app_bundle_url, path];
+            let app_bundle_url_str = nsstring_to_string!(path);
+            if let Some(app_bundle_url_str) = app_bundle_url_str {
+                if app_bundle_url_str == bundle_url.to_string() {
+                    target_app = app;
+                    break;
                 }
             }
-            let ns_object_class = Class::get("NSObject").unwrap();
-            let alloc_selector = Sel::register("alloc");
-            msg_send![ns_object_class, alloc]
-        })()
+        }
+        target_app
     };
-
-    let _: () = unsafe {
-        let activate_selector = Sel::register("activateWithOptions:");
-        let _: () = msg_send![target_app, activateWithOptions: 1];
-        return ();
+    unsafe {
+        let _: () = msg_send![target_app, activateWithOptions: NSApplicationActivateIgnoringOtherApps];
     };
 }
 
@@ -150,7 +140,7 @@ fn register_shortcut(window: &Window<Wry>, shortcut: &str) {
             window.hide().unwrap();
             if let Some(prev_frontmost_window_path) = get_previous_app(&window) {
                 println!("prev_frontmost_window_path: {:?}", prev_frontmost_window_path);
-                switch_to_app(&prev_frontmost_window_path);
+                active_another_app(&prev_frontmost_window_path);
             }
         } else {
             set_previous_app(&window, get_frontmost_app_path());
@@ -174,7 +164,7 @@ fn register_shortcut(window: &Window<Wry>, shortcut: &str) {
                     if window.is_visible().unwrap() {
                         window.hide().unwrap();
                         if let Some(prev_frontmost_window_path) = get_previous_app(&window) {
-                            switch_to_app(&prev_frontmost_window_path);
+                            active_another_app(&prev_frontmost_window_path);
                         }
                     }
                 }
