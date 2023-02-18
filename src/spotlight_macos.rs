@@ -11,6 +11,7 @@ use objc::{
 use tauri::{
     GlobalShortcutManager, Manager, PhysicalPosition, PhysicalSize, Window, WindowEvent, Wry,
 };
+use super::Error;
 
 #[derive(Default, Debug)]
 pub struct SpotlightManager {
@@ -33,29 +34,30 @@ impl SpotlightManager {
         manager
     }
 
-    pub fn init_spotlight_window(&self, window: &Window<Wry>, shortcut: &str) {
-        let registered = set_previous_app(&window, get_frontmost_app_path());
+    pub fn init_spotlight_window(&self, window: &Window<Wry>, shortcut: &str) -> Result<(), Error> {
+        let registered = set_previous_app(&window, get_frontmost_app_path())?;
         if !registered {
-            register_shortcut(&window, shortcut);
+            register_shortcut(&window, shortcut)?;
             register_spotlight_window_backdrop(&window);
-            set_spotlight_window_collection_behavior(&window);
-            set_window_above_menubar(&window);
+            set_spotlight_window_collection_behavior(&window)?;
+            set_window_above_menubar(&window)?;
         }
+        Ok(())
     }
 }
 
-fn set_previous_app(window: &Window<Wry>, value: Option<String>) -> bool {
+fn set_previous_app(window: &Window<Wry>, value: Option<String>) -> Result<bool, Error> {
     let label = window.label().to_string();
     let handle = window.app_handle();
     let state = handle.state::<SpotlightManager>();
     let mut registered_window = state
         .registered_window
         .lock()
-        .unwrap();
+        .map_err(|_| Error::FailedToLockMutex)?;
     let existed = registered_window.contains(&label);
-    if let Some(current_app_path) = std::env::current_exe().unwrap().to_str() {
+    if let Some(current_app_path) = std::env::current_exe().map_err(|_| Error::FailedToGetExecutablePath)?.to_str() {
         if Some(current_app_path.to_string()) == value {
-            return existed;
+            return Ok(existed);
         }
     }
     if !existed {
@@ -64,19 +66,19 @@ fn set_previous_app(window: &Window<Wry>, value: Option<String>) -> bool {
     let mut previous_app = state
         .previous_app
         .lock()
-        .unwrap();
+        .map_err(|_| Error::FailedToLockMutex)?;
     *previous_app = value;
-    existed
+    Ok(existed)
 }
 
-fn get_previous_app(window: &Window<Wry>) -> Option<String> {
+fn get_previous_app(window: &Window<Wry>) -> Result<Option<String>, Error> {
     let handle = window.app_handle();
     let state = handle.state::<SpotlightManager>();
     let previous_app = state
         .previous_app
         .lock()
-        .unwrap();
-    previous_app.clone()
+        .map_err(|_| Error::FailedToLockMutex)?;
+    Ok(previous_app.clone())
 }
 
 #[macro_export]
@@ -97,11 +99,14 @@ macro_rules! nsstring_to_string {
     }};
 }
 
-fn active_another_app(bundle_url: &str) {
+fn active_another_app(bundle_url: &str) -> Result<(), Error> {
     let workspace = unsafe {
-        let workspace_class = Class::get("NSWorkspace").unwrap();
-        let shared_workspace: *mut Object = msg_send![workspace_class, sharedWorkspace];
-        shared_workspace
+        if let Some(workspace_class) = Class::get("NSWorkspace") {
+            let shared_workspace: *mut Object = msg_send![workspace_class, sharedWorkspace];
+            shared_workspace
+        } else {
+            return Err(Error::FailedToGetNSWorkspaceClass);
+        }
     };
     let running_apps = unsafe {
         let running_apps: *mut Object = msg_send![workspace, runningApplications];
@@ -109,70 +114,77 @@ fn active_another_app(bundle_url: &str) {
     };
     let target_app = unsafe {
         let count = msg_send![running_apps, count];
-        let ns_object_class = Class::get("NSObject").unwrap();
-        let mut target_app = msg_send![ns_object_class, alloc];
-        for i in 0..count {
-            let app: *mut Object = msg_send![running_apps, objectAtIndex: i];
-            let app_bundle_url: id = msg_send![app, bundleURL];
-            let path: id = msg_send![app_bundle_url, path];
-            let app_bundle_url_str = nsstring_to_string!(path);
-            if let Some(app_bundle_url_str) = app_bundle_url_str {
-                if app_bundle_url_str == bundle_url.to_string() {
-                    target_app = app;
-                    break;
+        if let Some(ns_object_class) = Class::get("NSObject") {
+            let mut target_app = msg_send![ns_object_class, alloc];
+            for i in 0..count {
+                let app: *mut Object = msg_send![running_apps, objectAtIndex: i];
+                let app_bundle_url: id = msg_send![app, bundleURL];
+                let path: id = msg_send![app_bundle_url, path];
+                let app_bundle_url_str = nsstring_to_string!(path);
+                if let Some(app_bundle_url_str) = app_bundle_url_str {
+                    if app_bundle_url_str == bundle_url.to_string() {
+                        target_app = app;
+                        break;
+                    }
                 }
             }
+            target_app
+        } else {
+            return Err(Error::FailedToGetNSObjectClass);
         }
-        target_app
     };
     unsafe {
         let _: () = msg_send![target_app, activateWithOptions: NSApplicationActivateIgnoringOtherApps];
     };
+    Ok(())
 }
 
-fn register_shortcut(window: &Window<Wry>, shortcut: &str) {
+fn register_shortcut(window: &Window<Wry>, shortcut: &str) -> Result<(), Error> {
     let window = window.to_owned();
     let w = window.clone();
     let mut shortcut_manager = window.app_handle().global_shortcut_manager();
-    if let Err(e) = shortcut_manager.register(shortcut, move || {
-        position_window_at_the_center_of_the_monitor_with_cursor(&window);
+    shortcut_manager.register(shortcut, move || {
+        position_window_at_the_center_of_the_monitor_with_cursor(&window).unwrap();
         if window.is_visible().unwrap() {
             window.hide().unwrap();
-            if let Some(prev_frontmost_window_path) = get_previous_app(&window) {
+            if let Ok(Some(prev_frontmost_window_path)) = get_previous_app(&window) {
                 println!("prev_frontmost_window_path: {:?}", prev_frontmost_window_path);
-                active_another_app(&prev_frontmost_window_path);
+                active_another_app(&prev_frontmost_window_path).unwrap();
             }
         } else {
-            set_previous_app(&window, get_frontmost_app_path());
+            set_previous_app(&window, get_frontmost_app_path()).unwrap();
             println!("frontmost window path {:?}", get_frontmost_app_path());
             window.set_focus().unwrap();
         }
-    }) {
-        println!("err: {}", e);
-    }
+    }).map_err(|_| Error::FailedToRegisterShortcut)?;
     let app_handle = w.app_handle();
     let state = app_handle.state::<SpotlightManager>();
     if let Some(close_shortcut) = state.close_shortcut.clone() {
-        if let Err(e) = shortcut_manager.register(&close_shortcut, move || {
-            let app_handle = w.app_handle();
-            let state = app_handle.state::<SpotlightManager>();
-            let registered_window = state.registered_window.lock().unwrap();
-            let window_labels = registered_window.clone();
-            std::mem::drop(registered_window);
-            for label in window_labels {
-                if let Some(window) = app_handle.get_window(&label) {
-                    if window.is_visible().unwrap() {
-                        window.hide().unwrap();
-                        if let Some(prev_frontmost_window_path) = get_previous_app(&window) {
-                            active_another_app(&prev_frontmost_window_path);
+        if let Ok(registered) = shortcut_manager.is_registered(&close_shortcut) {
+            if !registered {
+                shortcut_manager.register(&close_shortcut, move || {
+                    let app_handle = w.app_handle();
+                    let state = app_handle.state::<SpotlightManager>();
+                    let registered_window = state.registered_window.lock().unwrap();
+                    let window_labels = registered_window.clone();
+                    std::mem::drop(registered_window);
+                    for label in window_labels {
+                        if let Some(window) = app_handle.get_window(&label) {
+                            if window.is_visible().unwrap() {
+                                window.hide().unwrap();
+                                if let Ok(Some(prev_frontmost_window_path)) = get_previous_app(&window) {
+                                    active_another_app(&prev_frontmost_window_path).unwrap();
+                                }
+                            }
                         }
                     }
-                }
+                }).map_err(|_| Error::FailedToRegisterShortcut)?;
             }
-        }) {
-            println!("err: {}", e);
+        } else {
+            return Err(Error::FailedToRegisterShortcut);
         }
     }
+    Ok(())
 }
 
 fn register_spotlight_window_backdrop(window: &Window<Wry>) {
@@ -189,12 +201,11 @@ fn register_spotlight_window_backdrop(window: &Window<Wry>) {
 }
 
 /// Positions a given window at the center of the monitor with cursor
-fn position_window_at_the_center_of_the_monitor_with_cursor(window: &Window<Wry>) {
+fn position_window_at_the_center_of_the_monitor_with_cursor(window: &Window<Wry>) -> Result<(), Error> {
     if let Some(monitor) = get_monitor_with_cursor() {
         let display_size = monitor.size.to_logical::<f64>(monitor.scale_factor);
         let display_pos = monitor.position.to_logical::<f64>(monitor.scale_factor);
-
-        let handle: id = window.ns_window().unwrap() as _;
+        let handle: id = window.ns_window().map_err(|_| Error::FailedToGetNSWindow)? as _;
         let win_frame: NSRect = unsafe { handle.frame() };
         let rect = NSRect {
             origin: NSPoint {
@@ -205,11 +216,12 @@ fn position_window_at_the_center_of_the_monitor_with_cursor(window: &Window<Wry>
         };
         let _: () = unsafe { msg_send![handle, setFrame: rect display: YES] };
     }
+    Ok(())
 }
 
 /// Set the behaviors that makes the window appear on all workspaces
-fn set_spotlight_window_collection_behavior(window: &Window<Wry>) {
-    let handle: id = window.ns_window().unwrap() as _;
+fn set_spotlight_window_collection_behavior(window: &Window<Wry>) -> Result<(), Error> {
+    let handle: id = window.ns_window().map_err(|_| Error::FailedToGetNSWindow)? as _;
     unsafe {
         handle.setCollectionBehavior_(
             NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
@@ -218,12 +230,14 @@ fn set_spotlight_window_collection_behavior(window: &Window<Wry>) {
                 | NSWindowCollectionBehavior::NSWindowCollectionBehaviorIgnoresCycle,
         );
     };
+    Ok(())
 }
 
 /// Set the window above menubar level
-fn set_window_above_menubar(window: &Window<Wry>) {
-    let handle: id = window.ns_window().unwrap() as _;
+fn set_window_above_menubar(window: &Window<Wry>) -> Result<(), Error> {
+    let handle: id = window.ns_window().map_err(|_| Error::FailedToGetNSWindow)? as _;
     unsafe { handle.setLevel_((NSMainMenuWindowLevel + 2).into()) };
+    Ok(())
 }
 
 struct Monitor {

@@ -21,10 +21,10 @@ fn main() {
         .invoke_handler(tauri::generate_handler![greet])
         .setup(|app| {
             if let Some(window) = app.get_window("main") {
-                app.spotlight().init_spotlight_window(&window, "Ctrl+Shift+J");
+                app.spotlight().init_spotlight_window(&window, "Ctrl+Shift+J").unwrap();
             }
             if let Some(window) = app.get_window("secondary") {
-                app.spotlight().init_spotlight_window(&window, "Ctrl+Shift+K");
+                app.spotlight().init_spotlight_window(&window, "Ctrl+Shift+K").unwrap();
             }
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             Ok(())

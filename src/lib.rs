@@ -1,8 +1,10 @@
 #[cfg_attr(target_os = "macos", path = "spotlight_macos.rs")]
 #[cfg_attr(not(target_os = "macos"), path = "spotlight_others.rs")]
 mod spotlight;
+mod error;
 
 pub use spotlight::Config;
+pub use error::Error;
 
 use tauri::{
     plugin::{Builder, TauriPlugin},
