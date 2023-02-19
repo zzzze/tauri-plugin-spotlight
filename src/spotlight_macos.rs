@@ -15,6 +15,8 @@ use tauri::{
 use super::PluginConfig;
 use super::Error;
 
+static SELF_KEY_PREFIX: &'static str = "self:";
+
 #[derive(Default, Debug)]
 pub struct SpotlightManager {
     pub config: PluginConfig,
@@ -45,7 +47,6 @@ impl SpotlightManager {
         if !window.is_visible().map_err(|_| Error::FailedToCheckWindowVisibility)? {
             position_window_at_the_center_of_the_monitor_with_cursor(&window).unwrap();
             set_previous_app(&window, get_frontmost_app_path())?;
-            println!("frontmost window path {:?}", get_frontmost_app_path());
             window.set_focus().map_err(|_| Error::FailedToShowWindow)?;
         }
         Ok(())
@@ -55,8 +56,15 @@ impl SpotlightManager {
         if window.is_visible().map_err(|_| Error::FailedToCheckWindowVisibility)? {
             window.hide().map_err(|_| Error::FailedToHideWindow)?;
             if let Ok(Some(prev_frontmost_window_path)) = get_previous_app(&window) {
-                println!("prev_frontmost_window_path: {:?}", prev_frontmost_window_path);
-                active_another_app(&prev_frontmost_window_path)?;
+                if prev_frontmost_window_path.starts_with(SELF_KEY_PREFIX) {
+                    if let Some(window_label) = prev_frontmost_window_path.strip_prefix(SELF_KEY_PREFIX) {
+                        if let Some(window) = window.app_handle().get_window(window_label) {
+                            window.set_focus().map_err(|_| Error::FailedToShowWindow)?;
+                        }
+                    }
+                } else {
+                    active_another_app(&prev_frontmost_window_path)?;
+                }
             }
         }
         Ok(())
@@ -72,9 +80,23 @@ fn set_previous_app(window: &Window<Wry>, value: Option<String>) -> Result<bool,
         .lock()
         .map_err(|_| Error::FailedToLockMutex)?;
     let existed = registered_window.contains(&label);
+    let mut value = value;
     if let Some(current_app_path) = std::env::current_exe().map_err(|_| Error::FailedToGetExecutablePath)?.to_str() {
         if Some(current_app_path.to_string()) == value {
-            return Ok(existed);
+            let mut activated_non_spotlight_window: Option<String> = None;
+            for window in handle.windows().values() {
+                if let Ok(visible) = window.is_visible() {
+                    if visible {
+                        activated_non_spotlight_window = Some(window.label().to_string());
+                        break;
+                    }
+                }
+            }
+            if let Some(activated_non_spotlight_window) = activated_non_spotlight_window {
+                value = Some(format!("{}{}", SELF_KEY_PREFIX, activated_non_spotlight_window));
+            } else {
+                return Ok(existed);
+            }
         }
     }
     if !existed {
