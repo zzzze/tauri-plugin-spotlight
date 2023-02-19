@@ -3,6 +3,11 @@ name = "tauri-plugin-spotlight"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.57"
+license = "MIT OR Apache-2.0"
+keywords = ["tauri", "spotlight"]
+description = "A Tauri plugin that provides a MacOS Spotlight-like search functionality for Tauri windows."
+repository = "https://github.com/zzzze/tauri-plugin-spotlight"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
