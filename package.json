@@ -1,7 +1,15 @@
 {
   "name": "tauri-plugin-spotlight-api",
-  "version": "1.0.0",
-  "description": "",
+  "version": "0.1.0",
+  "description": "Tauri plugin that provides a MacOS Spotlight-like search functionality for Tauri windows.",
+  "homepage": "https://github.com/zzzze/tauri-plugin-spotlight",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zzzze/tauri-plugin-spotlight"
+  },
+  "bugs": {
+    "url": "https://github.com/zzzze/tauri-plugin-spotlight/issues"
+  },
   "main": "index.js",
   "type": "module",
   "browser": "dist-js/index.min.js",
@@ -27,7 +35,10 @@
   "dependencies": {
     "@tauri-apps/api": "^1.2.0"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "keywords": [
+    "tauri",
+    "spotlight"
+  ],
+  "author": "VinZhang <zhangzs0000@gmail.com>",
+  "license": "MIT"
 }
