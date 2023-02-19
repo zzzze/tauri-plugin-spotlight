@@ -68,7 +68,7 @@
         "resizable": false,
         "title": "react-app",
         "center": true,
-        "alwaysOnTop": true,
+        "alwaysOnTop": false,
         "width": 600
       },
       {

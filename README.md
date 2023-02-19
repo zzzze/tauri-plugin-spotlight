@@ -135,6 +135,30 @@ import { hide } from 'tauri-plugin-spotlight-api';
 void hide();
 ```
 
+## Example App
+
+### Prepare
+
+1. Build frontend API the plugin.
+
+```bash
+pnpm i
+pnpm build
+```
+
+2. Install dependencies of example app.
+
+```bash
+cd examples/react-app
+pnpm i
+```
+
+3. Start example app.
+
+```bash
+pnpm tauri dev
+```
+
 ## Thanks
 
 This plugin was inspired by the [tauri-macos-spotlight-example](https://github.com/ahkohd/tauri-macos-spotlight-example)
