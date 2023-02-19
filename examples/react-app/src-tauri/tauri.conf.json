@@ -86,5 +86,15 @@
         "width": 600
       }
     ]
+  },
+  "plugins": {
+    "spotlight": {
+      "windows": [{
+        "label": "secondary",
+        "shortcut": "Ctrl+Shift+K"
+      }],
+      "close_shortcut": "Escape",
+      "hide_when_inactive": true
+    }
   }
 }
