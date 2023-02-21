@@ -153,28 +153,26 @@ fn active_another_app(bundle_url: &str) -> Result<(), Error> {
     };
     let target_app = unsafe {
         let count = msg_send![running_apps, count];
-        if let Some(ns_object_class) = Class::get("NSObject") {
-            let mut target_app = msg_send![ns_object_class, alloc];
-            for i in 0..count {
-                let app: *mut Object = msg_send![running_apps, objectAtIndex: i];
-                let app_bundle_url: id = msg_send![app, bundleURL];
-                let path: id = msg_send![app_bundle_url, path];
-                let app_bundle_url_str = nsstring_to_string!(path);
-                if let Some(app_bundle_url_str) = app_bundle_url_str {
-                    if app_bundle_url_str == bundle_url.to_string() {
-                        target_app = app;
-                        break;
-                    }
+        let mut target_app: Option<*mut Object> = None;
+        for i in 0..count {
+            let app: *mut Object = msg_send![running_apps, objectAtIndex: i];
+            let app_bundle_url: id = msg_send![app, bundleURL];
+            let path: id = msg_send![app_bundle_url, path];
+            let app_bundle_url_str = nsstring_to_string!(path);
+            if let Some(app_bundle_url_str) = app_bundle_url_str {
+                if app_bundle_url_str == bundle_url.to_string() {
+                    target_app = Some(app);
+                    break;
                 }
             }
-            target_app
-        } else {
-            return Err(Error::FailedToGetNSObjectClass);
         }
+        target_app
     };
-    unsafe {
-        let _: () = msg_send![target_app, activateWithOptions: NSApplicationActivateIgnoringOtherApps];
-    };
+    if let Some(app) = target_app {
+        unsafe {
+            let _: () = msg_send![app, activateWithOptions: NSApplicationActivateIgnoringOtherApps];
+        };
+    }
     Ok(())
 }
 

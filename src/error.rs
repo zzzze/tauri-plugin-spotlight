@@ -5,7 +5,6 @@ pub enum Error {
     FailedToRegisterShortcut,
     FailedToGetNSWindow,
     FailedToGetNSWorkspaceClass,
-    FailedToGetNSObjectClass,
     FailedToCheckWindowVisibility,
     FailedToHideWindow,
     FailedToShowWindow,
