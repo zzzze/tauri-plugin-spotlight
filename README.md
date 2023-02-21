@@ -58,8 +58,7 @@ fn main() {
                     shortcut: String::from("Ctrl+Shift+J"),
                 },
             ]),
-            close_shortcut: Some(String::from("Escape")),
-            hide_when_inactive: Some(true),
+            global_close_shortcut: Some(String::from("Escape")),
         })))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -78,8 +77,7 @@ fn main() {
         "label": "main",
         "shortcut": "Ctrl+Shift+J"
       }],
-      "close_shortcut": "Escape",
-      "hide_when_inactive": true
+      "global_close_shortcut": "Escape"
     }
   }
 }
@@ -107,8 +105,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_spotlight::init(Some(tauri_plugin_spotlight::PluginConfig {
             windows: None,
-            close_shortcut: Some(String::from("Escape")),
-            hide_when_inactive: Some(true),
+            global_close_shortcut: Some(String::from("Escape")),
         })))
         .setup(|mut app| {
             if let Some(window) = app.get_window("main") {

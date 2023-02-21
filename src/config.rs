@@ -9,8 +9,7 @@ pub struct WindowConfig {
 #[derive(serde::Deserialize, Default, Debug, Clone, PartialEq)]
 pub struct PluginConfig {
     pub windows: Option<Vec<WindowConfig>>,
-    pub close_shortcut: Option<String>,
-    pub hide_when_inactive: Option<bool>,
+    pub global_close_shortcut: Option<String>,
 }
 
 impl PluginConfig {
@@ -28,7 +27,10 @@ impl PluginConfig {
         if let Some(w) = b.windows.clone() {
             for config in w {
                 if !dict.contains_key(&config.label) {
-                    windows.push(WindowConfig { label: config.label, shortcut: config.shortcut });
+                    windows.push(WindowConfig {
+                        label: config.label,
+                        shortcut: config.shortcut,
+                    });
                 }
             }
         }
@@ -40,8 +42,7 @@ impl PluginConfig {
                     Some(windows)
                 }
             },
-            close_shortcut: a.close_shortcut.clone().or(b.close_shortcut.clone()),
-            hide_when_inactive: a.hide_when_inactive.clone().or(b.hide_when_inactive.clone()),
+            global_close_shortcut: a.global_close_shortcut.clone().or(b.global_close_shortcut.clone()),
         }
     }
 }
@@ -61,8 +62,7 @@ mod tests {
                     shortcut: String::from("Ctrl+I"),
                 },
             ]),
-            close_shortcut: Some(String::from("Escape")),
-            hide_when_inactive: Some(true),
+            global_close_shortcut: Some(String::from("Escape")),
         };
         let c = PluginConfig::merge(&a, &b);
         assert_eq!(c, b);
@@ -77,8 +77,7 @@ mod tests {
                     shortcut: String::from("Ctrl+I"),
                 },
             ]),
-            close_shortcut: None,
-            hide_when_inactive: None,
+            global_close_shortcut: None,
         };
         let b = PluginConfig {
             windows: Some(vec![
@@ -87,8 +86,7 @@ mod tests {
                     shortcut: String::from("bar"),
                 },
             ]),
-            close_shortcut: None,
-            hide_when_inactive: None,
+            global_close_shortcut: None,
         };
         let c = PluginConfig::merge(&a, &b);
         assert_eq!(c, PluginConfig {
@@ -102,8 +100,7 @@ mod tests {
                     shortcut: String::from("bar"),
                 },
             ]),
-            close_shortcut: None,
-            hide_when_inactive: None,
+            global_close_shortcut: None,
         });
     }
 
@@ -111,13 +108,11 @@ mod tests {
     fn a_takes_precedence_over_b() {
         let a = PluginConfig {
             windows: None,
-            close_shortcut: Some(String::from("Escape")),
-            hide_when_inactive: Some(true),
+            global_close_shortcut: Some(String::from("Escape")),
         };
         let b = PluginConfig {
             windows: None,
-            close_shortcut: Some(String::from("baz")),
-            hide_when_inactive: Some(false),
+            global_close_shortcut: Some(String::from("baz")),
         };
         let c = PluginConfig::merge(&a, &b);
         assert_eq!(c, a);

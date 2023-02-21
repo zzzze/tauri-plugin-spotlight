@@ -61,6 +61,7 @@
       {
         "label": "main",
         "url": "index.html",
+        "visible": false,
         "decorations": false,
         "fullscreen": false,
         "transparent": true,
@@ -69,7 +70,7 @@
         "title": "react-app",
         "center": true,
         "alwaysOnTop": false,
-        "width": 600
+        "width": 400
       },
       {
         "label": "secondary",
@@ -78,7 +79,21 @@
         "decorations": false,
         "fullscreen": false,
         "transparent": true,
-        "height": 600,
+        "height": 400,
+        "resizable": false,
+        "title": "react-app",
+        "center": true,
+        "alwaysOnTop": true,
+        "width": 500
+      },
+      {
+        "label": "tertiary",
+        "url": "index.html",
+        "visible": true,
+        "decorations": true,
+        "fullscreen": false,
+        "transparent": true,
+        "height": 500,
         "resizable": false,
         "title": "react-app",
         "center": true,
@@ -93,8 +108,7 @@
         "label": "secondary",
         "shortcut": "Ctrl+Shift+K"
       }],
-      "close_shortcut": "Escape",
-      "hide_when_inactive": true
+      "global_close_shortcut": "Escape"
     }
   }
 }

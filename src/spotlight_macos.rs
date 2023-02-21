@@ -85,6 +85,9 @@ fn set_previous_app(window: &Window<Wry>, value: Option<String>) -> Result<bool,
         if Some(current_app_path.to_string()) == value {
             let mut activated_non_spotlight_window: Option<String> = None;
             for window in handle.windows().values() {
+                if registered_window.contains(&window.label().to_string()) {
+                    continue;
+                }
                 if let Ok(visible) = window.is_visible() {
                     if visible {
                         activated_non_spotlight_window = Some(window.label().to_string());
@@ -196,7 +199,7 @@ fn register_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
     let mut shortcut_manager = window.app_handle().global_shortcut_manager();
     let app_handle = window.app_handle();
     let manager = app_handle.state::<SpotlightManager>();
-    if let Some(close_shortcut) = manager.config.close_shortcut.clone() {
+    if let Some(close_shortcut) = manager.config.global_close_shortcut.clone() {
         if let Ok(registered) = shortcut_manager.is_registered(&close_shortcut) {
             if !registered {
                 shortcut_manager.register(&close_shortcut, move || {
@@ -221,17 +224,11 @@ fn register_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
 
 fn register_spotlight_window_backdrop(window: &Window<Wry>) {
     let w = window.to_owned();
-    let app_handle = w.app_handle();
-    let manager = app_handle.state::<SpotlightManager>();
-    if let Some(hide_when_inactive) = manager.config.hide_when_inactive {
-        if hide_when_inactive {
-            window.on_window_event(move |event| {
-                if let WindowEvent::Focused(false) = event {
-                    w.hide().unwrap();
-                }
-            });
+    window.on_window_event(move |event| {
+        if let WindowEvent::Focused(false) = event {
+            w.hide().unwrap();
         }
-    }
+    });
 }
 
 /// Positions a given window at the center of the monitor with cursor

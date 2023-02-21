@@ -18,8 +18,7 @@ fn main() {
                     shortcut: String::from("Ctrl+Shift+J"),
                 },
             ]),
-            close_shortcut: Some(String::from("Escape")),
-            hide_when_inactive: Some(true),
+            global_close_shortcut: Some(String::from("Escape")),
         })))
         .invoke_handler(tauri::generate_handler![greet])
         .setup(|app| {
