@@ -10,7 +10,7 @@
   "bugs": {
     "url": "https://github.com/zzzze/tauri-plugin-spotlight/issues"
   },
-  "main": "index.js",
+  "main": "dist-js/index.mjs",
   "type": "module",
   "browser": "dist-js/index.min.js",
   "module": "dist-js/index.mjs",
