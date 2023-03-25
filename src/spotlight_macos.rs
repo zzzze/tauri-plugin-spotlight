@@ -36,7 +36,7 @@ impl SpotlightManager {
         if !registered {
             register_shortcut_for_window(&window, shortcut)?;
             register_close_shortcut(&window)?;
-            register_spotlight_window_backdrop(&window);
+            handle_focus_state_change(&window);
             set_spotlight_window_collection_behavior(&window)?;
             set_window_above_menubar(&window)?;
         }
@@ -222,11 +222,31 @@ fn register_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
     Ok(())
 }
 
-fn register_spotlight_window_backdrop(window: &Window<Wry>) {
+fn unregister_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
+    let window = window.to_owned();
+    let mut shortcut_manager = window.app_handle().global_shortcut_manager();
+    let app_handle = window.app_handle();
+    let manager = app_handle.state::<SpotlightManager>();
+    if let Some(close_shortcut) = manager.config.global_close_shortcut.clone() {
+        if let Ok(registered) = shortcut_manager.is_registered(&close_shortcut) {
+            if registered {
+                shortcut_manager.unregister(&close_shortcut).map_err(|_| Error::FailedToUnregisterShortcut)?;
+            }
+        } else {
+            return Err(Error::FailedToRegisterShortcut);
+        }
+    }
+    Ok(())
+}
+
+fn handle_focus_state_change(window: &Window<Wry>) {
     let w = window.to_owned();
     window.on_window_event(move |event| {
         if let WindowEvent::Focused(false) = event {
+            unregister_close_shortcut(&w).unwrap(); // FIXME:
             w.hide().unwrap();
+        } else {
+            register_close_shortcut(&w).unwrap(); // FIXME:
         }
     });
 }

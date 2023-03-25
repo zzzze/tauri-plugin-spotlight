@@ -2,25 +2,19 @@ use std::sync::Mutex;
 use tauri::{
     GlobalShortcutManager, Manager, Window, WindowEvent, Wry,
 };
+use super::PluginConfig;
 use super::Error;
 
 #[derive(Default, Debug)]
 pub struct SpotlightManager {
-    close_shortcut: Option<String>,
-    hide_when_inactive: bool,
+    pub config: PluginConfig,
     registered_window: Mutex<Vec<String>>,
 }
 
-pub struct Config {
-    pub close_shortcut: Option<String>,
-    pub hide_when_inactive: bool,
-}
-
 impl SpotlightManager {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: PluginConfig) -> Self {
         let mut manager = Self::default();
-        manager.close_shortcut = config.close_shortcut;
-        manager.hide_when_inactive = config.hide_when_inactive;
+        manager.config = config;
         manager
     }
 
@@ -36,7 +30,7 @@ impl SpotlightManager {
         if !registered {
             register_shortcut_for_window(&window, shortcut)?;
             register_close_shortcut(&window)?;
-            register_spotlight_window_backdrop(&window);
+            handle_focus_state_change(&window);
             registered_window.push(label);
         }
         Ok(())
@@ -77,7 +71,7 @@ fn register_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
     let mut shortcut_manager = window.app_handle().global_shortcut_manager();
     let app_handle = window.app_handle();
     let manager = app_handle.state::<SpotlightManager>();
-    if let Some(close_shortcut) = manager.close_shortcut.clone() {
+    if let Some(close_shortcut) = manager.config.global_close_shortcut.clone() {
         if let Ok(registered) = shortcut_manager.is_registered(&close_shortcut) {
             if !registered {
                 shortcut_manager.register(&close_shortcut, move || {
@@ -100,15 +94,31 @@ fn register_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
     Ok(())
 }
 
-fn register_spotlight_window_backdrop(window: &Window<Wry>) {
-    let w = window.to_owned();
-    let app_handle = w.app_handle();
-    let state = app_handle.state::<SpotlightManager>();
-    if state.hide_when_inactive {
-        window.on_window_event(move |event| {
-            if let WindowEvent::Focused(false) = event {
-                w.hide().unwrap();
+fn unregister_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
+    let window = window.to_owned();
+    let mut shortcut_manager = window.app_handle().global_shortcut_manager();
+    let app_handle = window.app_handle();
+    let manager = app_handle.state::<SpotlightManager>();
+    if let Some(close_shortcut) = manager.config.global_close_shortcut.clone() {
+        if let Ok(registered) = shortcut_manager.is_registered(&close_shortcut) {
+            if registered {
+                shortcut_manager.unregister(&close_shortcut).map_err(|_| Error::FailedToUnregisterShortcut)?;
             }
-        });
+        } else {
+            return Err(Error::FailedToRegisterShortcut);
+        }
     }
+    Ok(())
+}
+
+fn handle_focus_state_change(window: &Window<Wry>) {
+    let w = window.to_owned();
+    window.on_window_event(move |event| {
+        if let WindowEvent::Focused(false) = event {
+            unregister_close_shortcut(&w).unwrap(); // FIXME:
+            w.hide().unwrap();
+        } else {
+            register_close_shortcut(&w).unwrap(); // FIXME:
+        }
+    });
 }
