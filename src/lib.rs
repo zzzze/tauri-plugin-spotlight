@@ -46,12 +46,12 @@ pub fn init(spotlight_config: Option<PluginConfig>) -> TauriPlugin<Wry, Option<P
             Ok(())
         })
         .on_webview_ready(move |window| {
-            let app_handler = window.app_handle();
-            let manager = app_handler.state::<SpotlightManager>();
+            let app_handle = window.app_handle();
+            let manager = app_handle.state::<SpotlightManager>();
             if let Some(window_configs) = &manager.config.windows {
                 for window_config in window_configs {
                     if window.label() == window_config.label {
-                        app_handler.spotlight().init_spotlight_window(&window, &window_config.shortcut).unwrap();
+                        app_handle.spotlight().init_spotlight_window(&window, &window_config.shortcut).unwrap();
                     }
                 }
             }
