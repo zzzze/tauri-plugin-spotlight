@@ -12,6 +12,7 @@ use tauri::{
     GlobalShortcutManager, Manager, PhysicalPosition, PhysicalSize, Window, WindowEvent, Wry,
 };
 
+use super::WindowConfig;
 use super::PluginConfig;
 use super::Error;
 
@@ -31,14 +32,29 @@ impl SpotlightManager {
         manager
     }
 
-    pub fn init_spotlight_window(&self, window: &Window<Wry>, shortcut: &str) -> Result<(), Error> {
+    fn get_window_config(&self, window: &Window<Wry>) -> Option<WindowConfig> {
+        if let Some(window_configs) = self.config.windows.clone() {
+            for window_config in window_configs {
+                if window.label() == window_config.label {
+                    return Some(window_config.clone());
+                }
+            }
+        }
+        None
+    }
+
+    pub fn init_spotlight_window(&self, window: &Window<Wry>) -> Result<(), Error> {
+        let window_config = match self.get_window_config(&window) {
+            Some(window_config) => window_config,
+            None => return Ok(()),
+        };
         let registered = set_previous_app(&window, get_frontmost_app_path())?;
         if !registered {
-            register_shortcut_for_window(&window, shortcut)?;
+            register_shortcut_for_window(&window, &window_config)?;
             register_close_shortcut(&window)?;
             handle_focus_state_change(&window);
             set_spotlight_window_collection_behavior(&window)?;
-            set_window_above_menubar(&window)?;
+            set_window_level(&window, &window_config)?;
         }
         Ok(())
     }
@@ -179,10 +195,10 @@ fn active_another_app(bundle_url: &str) -> Result<(), Error> {
     Ok(())
 }
 
-fn register_shortcut_for_window(window: &Window<Wry>, shortcut: &str) -> Result<(), Error> {
+fn register_shortcut_for_window(window: &Window<Wry>, window_config: &WindowConfig) -> Result<(), Error> {
     let window = window.to_owned();
     let mut shortcut_manager = window.app_handle().global_shortcut_manager();
-    shortcut_manager.register(shortcut, move || {
+    shortcut_manager.register(&window_config.shortcut, move || {
         let app_handle = window.app_handle();
         let manager = app_handle.state::<SpotlightManager>();
         if window.is_visible().unwrap() {
@@ -284,10 +300,13 @@ fn set_spotlight_window_collection_behavior(window: &Window<Wry>) -> Result<(), 
     Ok(())
 }
 
-/// Set the window above menubar level
-fn set_window_above_menubar(window: &Window<Wry>) -> Result<(), Error> {
+fn set_window_level(window: &Window<Wry>, window_config: &WindowConfig) -> Result<(), Error> {
+    let window_level = match window_config.macos_window_level {
+        Some(level) => level,
+        None => NSMainMenuWindowLevel,
+    };
     let handle: id = window.ns_window().map_err(|_| Error::FailedToGetNSWindow)? as _;
-    unsafe { handle.setLevel_((NSMainMenuWindowLevel + 2).into()) };
+    unsafe { handle.setLevel_((window_level).into()) };
     Ok(())
 }
 

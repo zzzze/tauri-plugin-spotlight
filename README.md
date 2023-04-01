@@ -56,6 +56,7 @@ fn main() {
                 tauri_plugin_spotlight::WindowConfig {
                     label: String::from("main"),
                     shortcut: String::from("Ctrl+Shift+J"),
+                    macos_window_level: Some(20), // Default 24
                 },
             ]),
             global_close_shortcut: Some(String::from("Escape")),
@@ -75,7 +76,8 @@ fn main() {
     "spotlight": {
       "windows": [{
         "label": "main",
-        "shortcut": "Ctrl+Shift+J"
+        "shortcut": "Ctrl+Shift+J",
+        "macos_window_level": 20
       }],
       "global_close_shortcut": "Escape"
     }

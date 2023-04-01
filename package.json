@@ -1,6 +1,6 @@
 {
   "name": "tauri-plugin-spotlight-api",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Tauri plugin that provides a MacOS Spotlight-like search functionality for Tauri windows.",
   "homepage": "https://github.com/zzzze/tauri-plugin-spotlight",
   "repository": {

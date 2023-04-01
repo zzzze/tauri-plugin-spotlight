@@ -7,7 +7,6 @@ mod config;
 pub use config::{PluginConfig, WindowConfig};
 pub use error::Error;
 
-use spotlight::SpotlightManager;
 use tauri::{
     plugin::{Builder, TauriPlugin},
     Manager, Wry, Runtime, State, Window
@@ -47,14 +46,7 @@ pub fn init(spotlight_config: Option<PluginConfig>) -> TauriPlugin<Wry, Option<P
         })
         .on_webview_ready(move |window| {
             let app_handle = window.app_handle();
-            let manager = app_handle.state::<SpotlightManager>();
-            if let Some(window_configs) = &manager.config.windows {
-                for window_config in window_configs {
-                    if window.label() == window_config.label {
-                        app_handle.spotlight().init_spotlight_window(&window, &window_config.shortcut).unwrap();
-                    }
-                }
-            }
+            app_handle.spotlight().init_spotlight_window(&window).unwrap();
         })
         .build()
 }

@@ -2,7 +2,7 @@ use std::sync::Mutex;
 use tauri::{
     GlobalShortcutManager, Manager, Window, WindowEvent, Wry,
 };
-use super::PluginConfig;
+use super::{PluginConfig, WindowConfig};
 use super::Error;
 
 #[derive(Default, Debug)]
@@ -18,7 +18,22 @@ impl SpotlightManager {
         manager
     }
 
-    pub fn init_spotlight_window(&self, window: &Window<Wry>, shortcut: &str) -> Result<(), Error> {
+    fn get_window_config(&self, window: &Window<Wry>) -> Option<WindowConfig> {
+        if let Some(window_configs) = self.config.windows.clone() {
+            for window_config in window_configs {
+                if window.label() == window_config.label {
+                    return Some(window_config.clone());
+                }
+            }
+        }
+        None
+    }
+
+    pub fn init_spotlight_window(&self, window: &Window<Wry>) -> Result<(), Error> {
+        let window_config = match self.get_window_config(&window) {
+            Some(window_config) => window_config,
+            None => return Ok(()),
+        };
         let label = window.label().to_string();
         let handle = window.app_handle();
         let state = handle.state::<SpotlightManager>();
@@ -28,7 +43,7 @@ impl SpotlightManager {
             .map_err(|_| Error::FailedToLockMutex)?;
         let registered = registered_window.contains(&label);
         if !registered {
-            register_shortcut_for_window(&window, shortcut)?;
+            register_shortcut_for_window(&window, &window_config)?;
             register_close_shortcut(&window)?;
             handle_focus_state_change(&window);
             registered_window.push(label);
@@ -51,10 +66,10 @@ impl SpotlightManager {
     }
 }
 
-fn register_shortcut_for_window(window: &Window<Wry>, shortcut: &str) -> Result<(), Error> {
+fn register_shortcut_for_window(window: &Window<Wry>, window_config: &WindowConfig) -> Result<(), Error> {
     let window = window.to_owned();
     let mut shortcut_manager = window.app_handle().global_shortcut_manager();
-    shortcut_manager.register(shortcut, move || {
+    shortcut_manager.register(&window_config.shortcut, move || {
         let app_handle = window.app_handle();
         let manager = app_handle.state::<SpotlightManager>();
         if window.is_visible().unwrap() {

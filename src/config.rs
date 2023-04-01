@@ -4,6 +4,7 @@ use std::collections::HashMap;
 pub struct WindowConfig {
     pub label: String,
     pub shortcut: String,
+    pub macos_window_level: Option<i32>,
 }
 
 #[derive(serde::Deserialize, Default, Debug, Clone, PartialEq)]
@@ -30,6 +31,7 @@ impl PluginConfig {
                     windows.push(WindowConfig {
                         label: config.label,
                         shortcut: config.shortcut,
+                        macos_window_level: config.macos_window_level,
                     });
                 }
             }
@@ -60,6 +62,7 @@ mod tests {
                 WindowConfig {
                     label: String::from("main"),
                     shortcut: String::from("Ctrl+I"),
+                    macos_window_level: None,
                 },
             ]),
             global_close_shortcut: Some(String::from("Escape")),
@@ -75,6 +78,7 @@ mod tests {
                 WindowConfig {
                     label: String::from("main"),
                     shortcut: String::from("Ctrl+I"),
+                    macos_window_level: None,
                 },
             ]),
             global_close_shortcut: None,
@@ -84,6 +88,7 @@ mod tests {
                 WindowConfig {
                     label: String::from("foo"),
                     shortcut: String::from("bar"),
+                    macos_window_level: None,
                 },
             ]),
             global_close_shortcut: None,
@@ -94,10 +99,12 @@ mod tests {
                 WindowConfig {
                     label: String::from("main"),
                     shortcut: String::from("Ctrl+I"),
+                    macos_window_level: None,
                 },
                 WindowConfig {
                     label: String::from("foo"),
                     shortcut: String::from("bar"),
+                    macos_window_level: None,
                 },
             ]),
             global_close_shortcut: None,
