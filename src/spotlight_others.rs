@@ -53,6 +53,7 @@ impl SpotlightManager {
 
     pub fn show(&self, window: &Window<Wry>) -> Result<(), Error> {
         if !window.is_visible().map_err(|_| Error::FailedToCheckWindowVisibility)? {
+            window.show().map_err(|_| Error::FailedToShowWindow)?;
             window.set_focus().map_err(|_| Error::FailedToShowWindow)?;
         }
         Ok(())
