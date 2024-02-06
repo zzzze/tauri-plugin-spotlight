@@ -40,7 +40,7 @@ impl SpotlightManager {
         let mut registered_window = state
             .registered_window
             .lock()
-            .map_err(|_| Error::FailedToLockMutex)?;
+            .map_err(|_| Error::Mutex(String::from("failed to lock registered window")))?;
         let registered = registered_window.contains(&label);
         if !registered {
             register_shortcut_for_window(&window, &window_config)?;
@@ -78,7 +78,7 @@ fn register_shortcut_for_window(window: &Window<Wry>, window_config: &WindowConf
         } else {
             manager.show(&window).unwrap();
         }
-    }).map_err(|_| Error::FailedToRegisterShortcut)?;
+    }).map_err(|_| Error::Other(String::from("failed to register shortcut")))?;
     Ok(())
 }
 
@@ -87,10 +87,10 @@ fn register_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
     let mut shortcut_manager = window.app_handle().global_shortcut_manager();
     let app_handle = window.app_handle();
     let manager = app_handle.state::<SpotlightManager>();
-    if let Some(close_shortcut) = manager.config.global_close_shortcut.clone() {
-        if let Ok(registered) = shortcut_manager.is_registered(&close_shortcut) {
+    if let Some(close_shortcut) = &manager.config.global_close_shortcut {
+        if let Ok(registered) = shortcut_manager.is_registered(close_shortcut) {
             if !registered {
-                shortcut_manager.register(&close_shortcut, move || {
+                shortcut_manager.register(close_shortcut, move || {
                     let app_handle = window.app_handle();
                     let state = app_handle.state::<SpotlightManager>();
                     let registered_window = state.registered_window.lock().unwrap();
@@ -101,10 +101,10 @@ fn register_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
                             window.hide().unwrap();
                         }
                     }
-                }).map_err(|_| Error::FailedToRegisterShortcut)?;
+                }).map_err(tauri::Error::Runtime)?;
             }
         } else {
-            return Err(Error::FailedToRegisterShortcut);
+            return Err(Error::Other(String::from("failed to register shortcut")));
         }
     }
     Ok(())
@@ -118,10 +118,10 @@ fn unregister_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
     if let Some(close_shortcut) = manager.config.global_close_shortcut.clone() {
         if let Ok(registered) = shortcut_manager.is_registered(&close_shortcut) {
             if registered {
-                shortcut_manager.unregister(&close_shortcut).map_err(|_| Error::FailedToUnregisterShortcut)?;
+                shortcut_manager.unregister(&close_shortcut).map_err(tauri::Error::Runtime)?;
             }
         } else {
-            return Err(Error::FailedToRegisterShortcut);
+            return Err(Error::Other(String::from("failed to unregister shortcut")));
         }
     }
     Ok(())

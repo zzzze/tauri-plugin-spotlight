@@ -30,6 +30,7 @@ function App () {
     <div className="container">
       <div className="row">
         <form
+          autoComplete='off'
           onSubmit={(e) => {
             e.preventDefault()
             void greet()
@@ -37,6 +38,8 @@ function App () {
         >
           <input
             id="greet-input"
+            autoComplete='off'
+            autoCorrect='off'
             onChange={(e) => { setName(e.currentTarget.value) }}
             placeholder="Enter a name..."
             autoFocus
