@@ -42,11 +42,11 @@ impl SpotlightManager {
         None
     }
 
-    pub fn init_spotlight_window(&self, window: &Window<Wry>) -> Result<(), Error> {
-        let window_config = match self.get_window_config(&window) {
-            Some(window_config) => window_config,
-            None => return Ok(()),
-        };
+    pub fn init_spotlight_window(&self, window: &Window<Wry>, window_config: WindowConfig) -> Result<(), Error> {
+        // let window_config = match self.get_window_config(&window) {
+        //     Some(window_config) => window_config,
+        //     None => return Ok(()),
+        // };
         let label = window.label();
         let mut map = self.registered_panels.write().map_err(|_| Error::RwLock(String::from("failed to write registered panels")))?;
         if map.get(label).is_none() {

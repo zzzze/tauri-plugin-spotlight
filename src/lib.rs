@@ -44,9 +44,5 @@ pub fn init(spotlight_config: Option<PluginConfig>) -> TauriPlugin<Wry, Option<P
             ));
             Ok(())
         })
-        .on_webview_ready(move |window| {
-            let app_handle = window.app_handle();
-            app_handle.spotlight().init_spotlight_window(&window).unwrap();
-        })
         .build()
 }
