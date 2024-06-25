@@ -115,8 +115,12 @@ fn register_shortcut_for_window(window: &Window<Wry>, window_config: &WindowConf
         let manager = app_handle.state::<SpotlightManager>();
         if window.is_visible().unwrap() {
             manager.hide(&window).unwrap();
+            // Emit a message when the window is shown
+            window.emit("spotlight-window-hidden", {}).unwrap();
         } else {
             manager.show(&window).unwrap();
+            // Emit a message when the window is shown
+            window.emit("spotlight-window-shown", {}).unwrap();
         }
     }).map_err(|_| Error::Other(String::from("failed to register shortcut")))?;
     Ok(())
