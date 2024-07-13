@@ -44,27 +44,28 @@ impl PluginConfig {
                     Some(windows)
                 }
             },
-            global_close_shortcut: a.global_close_shortcut.clone().or(b.global_close_shortcut.clone()),
+            global_close_shortcut: a
+                .global_close_shortcut
+                .clone()
+                .or(b.global_close_shortcut.clone()),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::WindowConfig;
     use super::PluginConfig;
+    use super::WindowConfig;
 
     #[test]
     fn merge_and_override_default_value() {
         let a = PluginConfig::default();
         let b = PluginConfig {
-            windows: Some(vec![
-                WindowConfig {
-                    label: String::from("main"),
-                    shortcut: String::from("Ctrl+I"),
-                    macos_window_level: None,
-                },
-            ]),
+            windows: Some(vec![WindowConfig {
+                label: String::from("main"),
+                shortcut: String::from("Ctrl+I"),
+                macos_window_level: None,
+            }]),
             global_close_shortcut: Some(String::from("Escape")),
         };
         let c = PluginConfig::merge(&a, &b);
@@ -74,41 +75,40 @@ mod tests {
     #[test]
     fn merge_windows() {
         let a = PluginConfig {
-            windows: Some(vec![
-                WindowConfig {
-                    label: String::from("main"),
-                    shortcut: String::from("Ctrl+I"),
-                    macos_window_level: None,
-                },
-            ]),
+            windows: Some(vec![WindowConfig {
+                label: String::from("main"),
+                shortcut: String::from("Ctrl+I"),
+                macos_window_level: None,
+            }]),
             global_close_shortcut: None,
         };
         let b = PluginConfig {
-            windows: Some(vec![
-                WindowConfig {
-                    label: String::from("foo"),
-                    shortcut: String::from("bar"),
-                    macos_window_level: None,
-                },
-            ]),
+            windows: Some(vec![WindowConfig {
+                label: String::from("foo"),
+                shortcut: String::from("bar"),
+                macos_window_level: None,
+            }]),
             global_close_shortcut: None,
         };
         let c = PluginConfig::merge(&a, &b);
-        assert_eq!(c, PluginConfig {
-            windows: Some(vec![
-                WindowConfig {
-                    label: String::from("main"),
-                    shortcut: String::from("Ctrl+I"),
-                    macos_window_level: None,
-                },
-                WindowConfig {
-                    label: String::from("foo"),
-                    shortcut: String::from("bar"),
-                    macos_window_level: None,
-                },
-            ]),
-            global_close_shortcut: None,
-        });
+        assert_eq!(
+            c,
+            PluginConfig {
+                windows: Some(vec![
+                    WindowConfig {
+                        label: String::from("main"),
+                        shortcut: String::from("Ctrl+I"),
+                        macos_window_level: None,
+                    },
+                    WindowConfig {
+                        label: String::from("foo"),
+                        shortcut: String::from("bar"),
+                        macos_window_level: None,
+                    },
+                ]),
+                global_close_shortcut: None,
+            }
+        );
     }
 
     #[test]

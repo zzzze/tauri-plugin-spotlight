@@ -33,7 +33,7 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.tauri.dev",
+      "identifier": "com.zzzze.tauri-plugin-spotlight",
       "longDescription": "",
       "macOS": {
         "entitlements": null,
@@ -104,10 +104,12 @@
   },
   "plugins": {
     "spotlight": {
-      "windows": [{
-        "label": "secondary",
-        "shortcut": "Ctrl+Shift+K"
-      }],
+      "windows": [
+        {
+          "label": "secondary",
+          "shortcut": "Ctrl+Shift+K"
+        }
+      ],
       "global_close_shortcut": "Escape"
     }
   }

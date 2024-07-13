@@ -11,18 +11,19 @@ fn greet(name: &str) -> String {
 
 fn main() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_spotlight::init(Some(tauri_plugin_spotlight::PluginConfig {
-            windows: Some(vec![
-                tauri_plugin_spotlight::WindowConfig {
+        .plugin(tauri_plugin_spotlight::init(Some(
+            tauri_plugin_spotlight::PluginConfig {
+                windows: Some(vec![tauri_plugin_spotlight::WindowConfig {
                     label: String::from("main"),
                     shortcut: String::from("Ctrl+Shift+J"),
                     macos_window_level: None,
-                },
-            ]),
-            global_close_shortcut: Some(String::from("Escape")),
-        })))
+                }]),
+                global_close_shortcut: Some(String::from("Escape")),
+            },
+        )))
         .invoke_handler(tauri::generate_handler![greet])
         .setup(|app| {
+            #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             Ok(())
         })

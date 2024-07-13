@@ -1,10 +1,13 @@
 use core::fmt;
 
 use bitflags::bitflags;
-use objc_id::{Id, ShareId};
 use cocoa::{
-    appkit::{NSMainMenuWindowLevel, NSView, NSViewHeightSizable, NSViewWidthSizable, NSWindowCollectionBehavior},
-    base::{id, nil, BOOL, YES}, foundation::NSRect,
+    appkit::{
+        NSMainMenuWindowLevel, NSView, NSViewHeightSizable, NSViewWidthSizable,
+        NSWindowCollectionBehavior,
+    },
+    base::{id, nil, BOOL, YES},
+    foundation::NSRect,
 };
 use objc::{
     class,
@@ -14,6 +17,7 @@ use objc::{
     sel, sel_impl, Message,
 };
 use objc_foundation::INSObject;
+use objc_id::{Id, ShareId};
 use tauri::{Window, Wry};
 
 extern "C" {
