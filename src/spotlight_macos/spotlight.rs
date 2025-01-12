@@ -51,8 +51,10 @@ impl SpotlightManager {
         let mut map = self.registered_panels.write().map_err(|_| Error::RwLock(String::from("failed to write registered panels")))?;
         if map.get(label).is_none() {
             map.insert(String::from(label), Mutex::new(create_spotlight_panel(window)));
-            register_shortcut_for_window(&window, &window_config)?;
-            register_close_shortcut(&window)?;
+            if !window_config.shortcut.is_empty() {
+                register_shortcut_for_window(&window, &window_config)?;
+                register_close_shortcut(&window)?;
+            }
             handle_focus_state_change(&window);
             set_window_level(&window, &window_config)?;
         }
