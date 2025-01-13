@@ -1,3 +1,4 @@
+[workspace]
 [package]
 name = "react-app"
 version = "0.0.0"

@@ -2734,7 +2734,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-spotlight"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "bitflags 2.4.2",
  "cocoa",
