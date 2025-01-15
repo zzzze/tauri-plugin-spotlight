@@ -14,7 +14,7 @@ use objc::{
     sel, sel_impl, Message,
 };
 use objc_foundation::INSObject;
-use tauri::{Window, Wry};
+use tauri::{WebviewWindow, Wry};
 
 extern "C" {
     pub fn object_setClass(obj: id, cls: id) -> id;
@@ -140,6 +140,11 @@ impl RawNSPanel {
         let _: () = unsafe { msg_send![self, setCollectionBehavior: behaviour] };
     }
 
+    pub(crate) fn destroy(&self) {
+        let _: () = unsafe { msg_send![self, close] };
+        let _: () = unsafe { msg_send![self, release] };
+    }
+
     fn set_delegate(&self, delegate: Option<Id<RawNSPanelDelegate>>) {
         if let Some(del) = delegate {
             let _: () = unsafe { msg_send![self, setDelegate: del] };
@@ -238,7 +243,7 @@ impl RawNSPanelDelegate {
     }
 }
 
-pub(crate) fn create_spotlight_panel(window: &Window<Wry>) -> ShareId<RawNSPanel> {
+pub(crate) fn create_spotlight_panel(window: &WebviewWindow<Wry>) -> ShareId<RawNSPanel> {
     // Convert NSWindow Object to NSPanel
     let handle: id = window.ns_window().unwrap() as _;
     let panel = RawNSPanel::from(handle);

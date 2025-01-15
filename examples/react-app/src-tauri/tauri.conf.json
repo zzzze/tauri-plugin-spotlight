@@ -103,12 +103,5 @@
     ]
   },
   "plugins": {
-    "spotlight": {
-      "windows": [{
-        "label": "secondary",
-        "shortcut": "Ctrl+Shift+K"
-      }],
-      "global_close_shortcut": "Escape"
-    }
   }
 }

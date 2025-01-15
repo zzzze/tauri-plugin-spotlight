@@ -8,18 +8,27 @@ keywords = ["tauri", "spotlight"]
 description = "A Tauri plugin that provides a MacOS Spotlight-like search functionality for Tauri windows."
 repository = "https://github.com/zzzze/tauri-plugin-spotlight"
 readme = "README.md"
+links = "tauri-plugin-spotlight"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tauri = { version = "1.2", features = ["global-shortcut-all"] }
+# tauri = { version = "2", features = ["global-shortcut-all"] }
+tauri = { workspace = true , features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 bitflags = "2.4.2"
 thiserror = "1.0.56"
+tracing = "0.1.40"
+
+[build-dependencies]
+tauri-plugin = { version = "2.0.3", features = ["build"] }
 
 [target."cfg(target_os = \"macos\")".dependencies]
 cocoa = { version = "0.24.1" }
 objc =  { version = "0.2.7" }
 objc-foundation = "0.1.1"
 objc_id = "0.1.1"
+
+[target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
+tauri-plugin-global-shortcut = "2"

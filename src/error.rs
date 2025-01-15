@@ -10,6 +10,8 @@ pub enum Error {
     FailedToShowWindow,
     #[error("tauri err: {0}")]
     Tauri(#[from] tauri::Error),
+    #[error("shortcut: {0}")]
+    TauriShortcut(#[from] tauri_plugin_global_shortcut::Error),
     #[error("rwLock: {0}")]
     RwLock(String),
     #[error("mutex: {0}")]

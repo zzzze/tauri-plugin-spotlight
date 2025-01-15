@@ -6,10 +6,10 @@ mod config;
 
 pub use config::{PluginConfig, WindowConfig};
 pub use error::Error;
+pub use spotlight::SpotlightManager;
 
 use tauri::{
-    plugin::{Builder, TauriPlugin},
-    Manager, Wry, Runtime, State, Window
+    plugin::{Builder, TauriPlugin}, Manager, Runtime, State, WebviewWindow, Wry
 };
 
 pub trait ManagerExt<R: Runtime> {
@@ -23,23 +23,23 @@ impl<R: Runtime, T: Manager<R>> ManagerExt<R> for T {
 }
 
 #[tauri::command]
-fn show(manager: State<'_, spotlight::SpotlightManager>, window: Window<Wry>) -> Result<(), String> {
+fn show(manager: State<'_, spotlight::SpotlightManager>, window: WebviewWindow<Wry>) -> Result<(), String> {
     manager.show(&window).map_err(|err| format!("{:?}", err))
 }
 
 #[tauri::command]
-fn hide(manager: State<'_, spotlight::SpotlightManager>, window: Window<Wry>) -> Result<(), String> {
+fn hide(manager: State<'_, spotlight::SpotlightManager>, window: WebviewWindow<Wry>) -> Result<(), String> {
     manager.hide(&window).map_err(|err| format!("{:?}", err))
 }
 
 pub fn init(spotlight_config: Option<PluginConfig>) -> TauriPlugin<Wry, Option<PluginConfig>> {
     Builder::<Wry, Option<PluginConfig>>::new("spotlight")
         .invoke_handler(tauri::generate_handler![show, hide])
-        .setup_with_config(|app, config| {
+        .setup(|app, plugin_api| {
             app.manage(spotlight::SpotlightManager::new(
                 PluginConfig::merge(
                     &spotlight_config.unwrap_or(PluginConfig::default()),
-                    &config.unwrap_or(PluginConfig::default()),
+                    &plugin_api.config().clone().unwrap_or(PluginConfig::default()),
                 )
             ));
             Ok(())

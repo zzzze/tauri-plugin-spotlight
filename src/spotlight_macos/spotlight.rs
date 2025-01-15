@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::{Mutex, RwLock}};
+use std::{collections::HashMap, str::FromStr, sync::{Mutex, RwLock}};
 use cocoa::{
     appkit::{CGFloat, NSWindow},
     base::{id, nil, BOOL, NO, YES},
@@ -6,12 +6,12 @@ use cocoa::{
 };
 use objc_id::ShareId;
 use objc::{class, msg_send, sel, sel_impl};
-use tauri::{
-    GlobalShortcutManager, Manager, PhysicalPosition, PhysicalSize, Window, WindowEvent, Wry
-};
+use tauri::{Manager, PhysicalPosition, PhysicalSize, WebviewWindow, WindowEvent, Wry};
 use super::panel::{create_spotlight_panel, RawNSPanel};
 use crate::{PluginConfig, WindowConfig};
 use crate::Error;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+use tracing::error;
 
 #[link(name = "Foundation", kind = "framework")]
 extern "C" {
@@ -31,7 +31,7 @@ impl SpotlightManager {
         manager
     }
 
-    fn get_window_config(&self, window: &Window<Wry>) -> Option<WindowConfig> {
+    fn get_window_config(&self, window: &WebviewWindow<Wry>) -> Option<WindowConfig> {
         if let Some(window_configs) = self.config.windows.clone() {
             for window_config in window_configs {
                 if window.label() == window_config.label {
@@ -42,7 +42,7 @@ impl SpotlightManager {
         None
     }
 
-    pub fn init_spotlight_window(&self, window: &Window<Wry>, window_config: WindowConfig) -> Result<(), Error> {
+    pub fn init_spotlight_window(&self, window: &WebviewWindow<Wry>, window_config: WindowConfig) -> Result<(), Error> {
         // let window_config = match self.get_window_config(&window) {
         //     Some(window_config) => window_config,
         //     None => return Ok(()),
@@ -61,7 +61,7 @@ impl SpotlightManager {
         Ok(())
     }
 
-    pub fn show(&self, window: &Window<Wry>) -> Result<(), Error> {
+    pub fn show(&self, window: &WebviewWindow<Wry>) -> Result<(), Error> {
         position_window_at_the_center_of_the_monitor_with_cursor(&window)?;
         let label = window.label();
         let map = self.registered_panels.read().map_err(|_| Error::RwLock(String::from("failed to read registered panels")))?;
@@ -72,7 +72,7 @@ impl SpotlightManager {
         Ok(())
     }
 
-    pub fn hide(&self, window: &Window<Wry>) -> Result<(), Error> {
+    pub fn hide(&self, window: &WebviewWindow<Wry>) -> Result<(), Error> {
         let label = window.label();
         let map = self.registered_panels.read().map_err(|_| Error::RwLock(String::from("failed to read registered panels")))?;
         if let Some(panel) = map.get(label) {
@@ -83,7 +83,7 @@ impl SpotlightManager {
     }
 }
 
-fn set_window_level(window: &Window<Wry>, window_config: &WindowConfig) -> Result<(), Error> {
+fn set_window_level(window: &WebviewWindow<Wry>, window_config: &WindowConfig) -> Result<(), Error> {
     if let Some(level) = window_config.macos_window_level {
         let handle: id = window.ns_window().map_err(|_| Error::FailedToGetNSWindow)? as _;
         unsafe { handle.setLevel_((level).into()) };
@@ -109,69 +109,74 @@ macro_rules! nsstring_to_string {
     }};
 }
 
-fn register_shortcut_for_window(window: &Window<Wry>, window_config: &WindowConfig) -> Result<(), Error> {
-    let window = window.to_owned();
-    let mut shortcut_manager = window.app_handle().global_shortcut_manager();
-    shortcut_manager.register(&window_config.shortcut, move || {
-        let app_handle = window.app_handle();
+fn register_shortcut_for_window(window: &WebviewWindow<Wry>, window_config: &WindowConfig) -> Result<(), Error> {
+    let window_label = window.label().to_string();
+    let shortcut_manager = window.app_handle().global_shortcut();
+    let shortcut = Shortcut::from_str(&window_config.shortcut).map_err(tauri_plugin_global_shortcut::Error::from)?;
+    shortcut_manager.on_shortcut(shortcut, move |app_handle, _, event| {
+        if event.state != tauri_plugin_global_shortcut::ShortcutState::Pressed {
+            return;
+        }
         let manager = app_handle.state::<SpotlightManager>();
-        if window.is_visible().unwrap() {
-            manager.hide(&window).unwrap();
-        } else {
-            manager.show(&window).unwrap();
+        if let Some(window) = app_handle.get_webview_window(&window_label) {
+            match window.is_visible() {
+                Ok(is_visible) => {
+                    if is_visible {
+                        manager.hide(&window).unwrap();
+                    } else {
+                        manager.show(&window).unwrap();
+                    }
+                },
+                Err(err) => {
+                    error!("failed to get window visibility: {}", err);
+                },
+            }
         }
     }).map_err(|_| Error::Other(String::from("failed to register shortcut")))?;
     Ok(())
 }
 
-fn register_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
+fn register_close_shortcut(window: &WebviewWindow<Wry>) -> Result<(), Error> {
     let window = window.to_owned();
-    let mut shortcut_manager = window.app_handle().global_shortcut_manager();
+    let shortcut_manager = window.app_handle().global_shortcut();
     let app_handle = window.app_handle();
     let manager = app_handle.state::<SpotlightManager>();
     if let Some(close_shortcut) = &manager.config.global_close_shortcut {
-        if let Ok(registered) = shortcut_manager.is_registered(&close_shortcut) {
-            if !registered {
-                shortcut_manager.register(&close_shortcut, move || {
-                    let app_handle = window.app_handle();
-                    let state = app_handle.state::<SpotlightManager>();
-                    let labels = if let Some(ref windows) = state.config.windows {
-                        windows.iter().map(|window| window.label.clone()).collect()
-                    } else {
-                        vec![]
-                    };
-                    for label in labels {
-                        if let Some(window) = app_handle.get_window(&label) {
-                            state.hide(&window).unwrap();
-                        }
+        let shortcut = Shortcut::from_str(&close_shortcut).map_err(tauri_plugin_global_shortcut::Error::from)?;
+        if !shortcut_manager.is_registered(shortcut.clone()) {
+            shortcut_manager.on_shortcut(shortcut.clone(), |app_handle, _, _| {
+                let state = app_handle.state::<SpotlightManager>();
+                let labels = if let Some(ref windows) = state.config.windows {
+                    windows.iter().map(|window| window.label.clone()).collect()
+                } else {
+                    vec![]
+                };
+                for label in labels {
+                    if let Some(window) = app_handle.get_webview_window(&label) {
+                        state.hide(&window).unwrap();
                     }
-                }).map_err(tauri::Error::Runtime)?;
-            }
-        } else {
-            return Err(Error::Other(String::from("failed to register shortcut")));
+                }
+            })?;
         }
     }
     Ok(())
 }
 
-fn unregister_close_shortcut(window: &Window<Wry>) -> Result<(), Error> {
+fn unregister_close_shortcut(window: &WebviewWindow<Wry>) -> Result<(), Error> {
     let window = window.to_owned();
-    let mut shortcut_manager = window.app_handle().global_shortcut_manager();
+    let shortcut_manager = window.app_handle().global_shortcut();
     let app_handle = window.app_handle();
     let manager = app_handle.state::<SpotlightManager>();
     if let Some(close_shortcut) = manager.config.global_close_shortcut.clone() {
-        if let Ok(registered) = shortcut_manager.is_registered(&close_shortcut) {
-            if registered {
-                shortcut_manager.unregister(&close_shortcut).map_err(tauri::Error::Runtime)?;
-            }
-        } else {
-            return Err(Error::Other(String::from("failed to register shortcut")));
+        let shortcut = Shortcut::from_str(&close_shortcut).map_err(tauri_plugin_global_shortcut::Error::from)?;
+        if shortcut_manager.is_registered(shortcut.clone()) {
+            shortcut_manager.unregister(shortcut.clone())?;
         }
     }
     Ok(())
 }
 
-fn handle_focus_state_change(window: &Window<Wry>) {
+fn handle_focus_state_change(window: &WebviewWindow<Wry>) {
     let w = window.to_owned();
     window.on_window_event(move |event| {
         if let WindowEvent::Focused(false) = event {
@@ -184,7 +189,7 @@ fn handle_focus_state_change(window: &Window<Wry>) {
 }
 
 /// Positions a given window at the center of the monitor with cursor
-fn position_window_at_the_center_of_the_monitor_with_cursor(window: &Window<Wry>) -> Result<(), Error> {
+fn position_window_at_the_center_of_the_monitor_with_cursor(window: &WebviewWindow<Wry>) -> Result<(), Error> {
     if let Some(monitor) = get_monitor_with_cursor() {
         let display_size = monitor.size.to_logical::<f64>(monitor.scale_factor);
         let display_pos = monitor.position.to_logical::<f64>(monitor.scale_factor);
